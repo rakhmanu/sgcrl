@@ -58,7 +58,7 @@ To run code, use
 ```
 export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
 python lp_contrastive.py
-
+python lp_contrastive.py --render=True
 ```
 
 
