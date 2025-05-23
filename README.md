@@ -56,7 +56,9 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib/nvidia
 
 To run code, use
 ```
+export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
 python lp_contrastive.py
+
 ```
 
 
