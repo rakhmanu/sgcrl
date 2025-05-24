@@ -38,7 +38,7 @@ def load(env_name, fixed_start_end=None):
   kwargs = {}
   if env_name == 'sawyer_bin':
     CLASS = SawyerBin
-    max_episode_steps = 150
+    max_episode_steps = 10
     kwargs['fixed_start_end'] = fixed_start_end
   elif env_name == 'sawyer_box':
     CLASS = SawyerBox
@@ -104,6 +104,7 @@ class SawyerBin(
     dist = np.linalg.norm(self._goal - obj_pos)
     obs = self._get_obs()
     r = float(dist < 0.05)  # Taken from metaworld
+
     done = False
     info = {}
         
@@ -132,6 +133,7 @@ class SawyerBin(
         low=np.full(2 * 7, -np.inf),
         high=np.full(2 * 7, np.inf),
         dtype=np.float32)
+
 
 
 class SawyerBox(

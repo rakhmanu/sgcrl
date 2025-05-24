@@ -3,6 +3,7 @@ import time
 from typing import Any, Dict, Iterator, List, NamedTuple, Optional, Tuple, Callable
 
 import acme
+from acme.core import Learner
 from acme import types
 from acme.jax import networks as networks_lib
 from acme.jax import utils
@@ -36,7 +37,7 @@ class TrainingState(NamedTuple):
   alpha_params: Optional[networks_lib.Params] = None
 
 
-class ContrastiveLearner(acme.Learner):
+class ContrastiveLearner(Learner):
   """Contrastive RL learner."""
 
   _state: TrainingState

@@ -16,6 +16,7 @@ from contrastive import utils as contrastive_utils
 import launchpad as lp
 import numpy as np
 import os
+from env_utils import SawyerBin
 
 FLAGS = flags.FLAGS
 
@@ -27,6 +28,7 @@ flags.DEFINE_string('alg', 'contrastive_cpc', 'Algorithm type, e.g. default is c
 flags.DEFINE_string('env', 'sawyer_bin', 'Environment type, e.g. default is sawyer bin')
 flags.DEFINE_integer('num_steps', 8_000_000, 'Number of steps to run', lower_bound=0)
 flags.DEFINE_bool('sample_goals', False, 'sample the goal position uniformly according to the environment (corresponds to the original contrastive_rl algorithm)')
+flags.DEFINE_bool('render', False, 'Whether to render the environment during training or evaluation')
 
 # fixed goal coordinates for supported environments
 fixed_goal_dict={'point_Spiral11x11': [np.array([5,5], dtype=float), np.array([10,10], dtype=float)],
@@ -103,7 +105,15 @@ def main(_):
   #   2D nav: point_{Spiral11x11}
   env_name = FLAGS.env
   print('Using env {}...'.format(env_name))
-  
+  if env_name == "sawyer_bin":
+      env = SawyerBin()
+  else:
+      raise ValueError(f"Unknown environment {env_name}")
+
+  #if FLAGS.render:
+      #env.reset()
+  #    env.render()  
+ 
   seed_idx = FLAGS.seed
   print('Using random seed {}...'.format(seed_idx))
   params = {
@@ -143,6 +153,7 @@ def main(_):
   else:
     raise NotImplementedError('Unknown method: %s' % alg)
 
+ 
 
   program = get_program(params)
   # Set terminal='tmux' if you want different components in different windows.
