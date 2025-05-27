@@ -16,7 +16,7 @@ class ContrastiveConfig:
   env_name: str = ''
   alg_name: str = ''
   seed: int = 0
-  max_number_of_steps: int = 8_000_000
+  max_number_of_steps: int = 800 #8_000_000
   num_actors: int = 4
 
   # env options
@@ -41,8 +41,8 @@ class ContrastiveConfig:
   target_entropy: float = 0.0
 
   # Replay options
-  min_replay_size: int = 10000
-  max_replay_size: int = 1000000
+  min_replay_size: int = 10000#10000
+  max_replay_size: int = 20000#1000000
   replay_table_name: str = adders_reverb.DEFAULT_PRIORITY_TABLE
   prefetch_size: int = 4
   num_parallel_calls: Optional[int] = 4

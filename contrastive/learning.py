@@ -52,7 +52,8 @@ class ContrastiveLearner(Learner):
       counter,
       logger,
       obs_to_goal,
-      config):
+      config
+      ):
     """Initialize the Contrastive RL learner.
 
     Args:
@@ -72,7 +73,6 @@ class ContrastiveLearner(Learner):
     self._num_sgd_steps_per_step = config.num_sgd_steps_per_step
     self._obs_dim = config.obs_dim
     self._use_td = config.use_td
-    
     if adaptive_entropy_coefficient:
       # alpha is the temperature parameter that determines the relative
       # importance of the entropy term versus the reward.
@@ -406,6 +406,10 @@ class ContrastiveLearner(Learner):
       metrics['steps_per_second'] = 0.
     # Attempts to write the logs.
     self._logger.write({**metrics, **counts})
+   
+
+    #if self._counter.get_counts().get('steps', 0) % 1000 == 0 and self._render_env is not None:
+       #self.render_episode(self._render_env)
 
   def get_variables(self, names):
     variables = {
@@ -419,3 +423,4 @@ class ContrastiveLearner(Learner):
 
   def restore(self, state):
     self._state = state
+

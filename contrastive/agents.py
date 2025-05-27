@@ -11,11 +11,11 @@ from contrastive import config as contrastive_config
 from contrastive import distributed_layout
 from contrastive import networks
 from contrastive import utils as contrastive_utils
-
+import contrastive
+from contrastive import utils as contrastive_utils
 from default import make_default_logger
-
+from env_utils import SawyerBin, SawyerBox, SawyerPeg
 import dm_env
-
 
 NetworkFactory = Callable[[specs.EnvironmentSpec],
                           networks.ContrastiveNetworks]
@@ -98,3 +98,4 @@ class DistributedContrastive(distributed_layout.DistributedLayout):
             save_dir = config.log_dir + config.alg_name + '_'
             + config.env_name + '_' + str(seed), add_uid = config.add_uid),
         config=config)
+

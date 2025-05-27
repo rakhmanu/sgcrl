@@ -25,7 +25,7 @@ from reverb import rate_limiters
 import tensorflow as tf
 import tree
 
-
+    
 class ContrastiveBuilder(builders.ActorLearnerBuilder):
   """Contrastive RL builder."""
 
@@ -49,7 +49,7 @@ class ContrastiveBuilder(builders.ActorLearnerBuilder):
       networks,
       dataset,
       replay_client = None,
-      counter = None,
+      counter = None, 
   ):
     # Create optimizers
     policy_optimizer = optax.adam(

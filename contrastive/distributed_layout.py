@@ -24,7 +24,6 @@ import numpy as np
 import reverb
 import tqdm
 
-
 ActorId = int
 AgentNetwork = Any
 PolicyNetwork = Any
@@ -87,7 +86,7 @@ def default_evaluator_factory(
     networks = network_factory(specs.make_environment_spec(environment))
 
     actor = make_actor(actor_key, policy_factory(networks), variable_source)
-
+    
     # Create logger and counter.
     counter = counting.Counter(counter, 'evaluator')
     logger = make_default_logger('evaluator', log_to_bigtable,
@@ -252,6 +251,7 @@ class DistributedLayout:
     counter = counting.Counter(counter, 'actor')
     # Only actor #0 will write to bigtable in order not to spam it too much.
     logger = self._actor_logger_fn(actor_id)
+
     # Create the loop to connect environment and agent.
     return environment_loop.EnvironmentLoop(environment, actor, counter,
                                             logger, observers=self._observers)
