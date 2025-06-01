@@ -10,7 +10,7 @@ import metaworld
 import numpy as np
 import point_env
 import fetch_envs
-import ant_envs
+#import ant_envs
 os.environ['SDL_VIDEODRIVER'] = 'dummy'
 
 
@@ -52,11 +52,11 @@ def load(env_name, fixed_start_end=None):
   elif env_name == 'sawyer_drawer':
     CLASS = SawyerDrawer
     max_episode_steps = 150
-    kwargs['fixed_start_end'] = fixed_start_end
+    #kwargs['fixed_start_end'] = fixed_start_end
   elif env_name == 'sawyer_push':
     CLASS = SawyerPush
     max_episode_steps = 150
-    kwargs['fixed_start_end'] = fixed_start_end
+    #kwargs['fixed_start_end'] = fixed_start_end
   elif env_name == 'sawyer_drawer_image':
     CLASS = SawyerDrawerImage
     max_episode_steps = 50
@@ -80,7 +80,8 @@ def load(env_name, fixed_start_end=None):
   elif env_name == 'fetch_reach':
     CLASS = fetch_envs.FetchReachEnv
     max_episode_steps = 50
-    kwargs['fixed_start_end'] = fixed_start_end
+    #kwargs['fixed_start_end'] = fixed_start_end
+    '''
   elif env_name == 'fetch_push':
     CLASS = fetch_envs.FetchPushEnv
     max_episode_steps = 50
@@ -103,6 +104,8 @@ def load(env_name, fixed_start_end=None):
       max_episode_steps = 700
     else:
       max_episode_steps = 1000
+      
+      '''
   elif env_name.startswith('point_'):
     CLASS = point_env.PointEnv
     kwargs['walls'] = env_name.split('_')[-1]
@@ -188,9 +191,9 @@ class SawyerDrawer(
     super(SawyerDrawer, self).reset_model()
     self._set_obj_xyz(np.random.uniform(-0.15, 0.0))
     self._target_pos = self._get_pos_objects().copy()
-
     self._set_obj_xyz(np.random.uniform(-0.15, 0.0))
-    return self._get_obs()
+    return self._get_obs().astype(np.float32)  
+
 
   @property
   def observation_space(self):
@@ -204,10 +207,10 @@ class SawyerDrawer(
                                  self._get_site_pos('leftEndEffector'))
     tcp_center = (finger_right + finger_left) / 2.0
     obj = self._get_pos_objects()
-    # Arm position is same as drawer position. We only provide the drawer
-    # Y coordinate.
-    return np.concatenate([tcp_center, [obj[1]],
-                           self._target_pos, [self._target_pos[1]]])
+    obs = np.concatenate([tcp_center, [obj[1]],
+                          self._target_pos, [self._target_pos[1]]])
+    return obs.astype(np.float32) 
+
 
   def step(self, action):
     obs = super(SawyerDrawer, self).step(action)

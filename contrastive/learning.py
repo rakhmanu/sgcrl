@@ -349,6 +349,7 @@ class ContrastiveLearner(Learner):
     # Use the JIT compiler.
     if config.jit:
       self._update_step = jax.jit(update_step)
+      
     else:
       self._update_step = update_step
 

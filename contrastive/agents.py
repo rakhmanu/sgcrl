@@ -14,7 +14,7 @@ from contrastive import utils as contrastive_utils
 import contrastive
 from contrastive import utils as contrastive_utils
 from default import make_default_logger
-from env_utils import SawyerBin, SawyerBox, SawyerPeg
+from env_utils import SawyerBin, SawyerBox, SawyerPeg, SawyerDrawer, SawyerPush
 import dm_env
 
 NetworkFactory = Callable[[specs.EnvironmentSpec],

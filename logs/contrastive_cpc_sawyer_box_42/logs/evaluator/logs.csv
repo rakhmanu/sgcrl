@@ -1,0 +1,2 @@
+delta_dist,episode_length,episode_return,evaluator_episodes,evaluator_steps,final_dist,init_dist,min_dist,steps_per_second,success,success_1000
+0.046901584,10,0.0,1,10,0.63884586,0.68574744,0.63884586,1.9719829460756764,0.0,nan

@@ -22,43 +22,40 @@ import numpy as np
 import gymnasium_robotics.envs.fetch.reach as reach
 import gymnasium_robotics.envs.fetch.push as push
 
-
 class FetchReachEnv(reach.MujocoFetchReachEnv):
-  """Wrapper for the FetchReach environment."""
+    """Wrapper for the FetchReach environment with goal concatenated into the observation."""
 
-  def __init__(self):
-    super(FetchReachEnv, self).__init__()
-    self._old_observation_space = self.observation_space
-    self._new_observation_space = gym.spaces.Box(
-        low=np.full((20,), -np.inf),
-        high=np.full((20,), np.inf),
-        dtype=np.float32)
-    self.observation_space = self._new_observation_space
+    def __init__(self):
+        super(FetchReachEnv, self).__init__()
+        self._partially_observable = False
+        self._freeze_rand_vec = False
+        self._set_task_called = True
 
-  def reset(self):
-    self.observation_space = self._old_observation_space
-    s = super(FetchReachEnv, self).reset()
-    self.observation_space = self._new_observation_space
-    return self.observation(s)
+        # 10 original obs + 3 achieved goal + 3 desired goal = 16 total
+        self._obs_dim = 16
+        self.observation_space = gym.spaces.Box(
+            low=np.full((self._obs_dim,), -np.inf),
+            high=np.full((self._obs_dim,), np.inf),
+            dtype=np.float32
+        )
 
-  def step(self, action):
-    s, _, _, _ = super(FetchReachEnv, self).step(action)
-    done = False
-    dist = np.linalg.norm(s['achieved_goal'] - s['desired_goal'])
-    r = float(dist < 0.05)  # Default from Fetch environment.
-    info = {}
-    return self.observation(s), r, done, info
+    def reset(self):
+        obs = super(FetchReachEnv, self).reset()
+        return self._observation(obs)
 
-  def observation(self, observation):
-    start_index = 0
-    end_index = 3
-    goal_pos_1 = observation['achieved_goal']
-    goal_pos_2 = observation['observation'][start_index:end_index]
-    assert np.all(goal_pos_1 == goal_pos_2)
-    s = observation['observation']
-    g = np.zeros_like(s)
-    g[start_index:end_index] = observation['desired_goal']
-    return np.concatenate([s, g]).astype(np.float32)
+    def step(self, action):
+        obs, _, _, _ = super(FetchReachEnv, self).step(action)
+        dist = np.linalg.norm(obs['achieved_goal'] - obs['desired_goal'])
+        reward = float(dist < 0.05)
+        done = False
+        info = {}
+        return self._observation(obs), reward, done, info
+
+    def _observation(self, obs_dict):
+        obs = obs_dict['observation']              # shape (10,)
+        achieved = obs_dict['achieved_goal']       # shape (3,)
+        desired = obs_dict['desired_goal']         # shape (3,)
+        return np.concatenate([obs, achieved, desired]).astype(np.float32)
 
 
 class FetchPushEnv(push.MujocoFetchPushEnv):
