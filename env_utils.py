@@ -48,6 +48,14 @@ def load(env_name, fixed_start_end=None):
     CLASS = SawyerPeg
     max_episode_steps = 150
     kwargs['fixed_start_end'] = fixed_start_end
+  elif env_name == 'sawyer_drawer':
+    CLASS = SawyerDrawer
+    max_episode_steps = 150
+    #kwargs['fixed_start_end'] = fixed_start_end
+  elif env_name == 'sawyer_push':
+    CLASS = SawyerPush
+    max_episode_steps = 150
+    #kwargs['fixed_start_end'] = fixed_start_end
   elif env_name.startswith('point_'):
     CLASS = point_env.PointEnv
     kwargs['walls'] = env_name.split('_')[-1]
@@ -209,6 +217,101 @@ class SawyerBox(
         low=np.full(2 * 11, -np.inf),
         high=np.full(2 * 11, np.inf),
         dtype=np.float32)
+
+
+class SawyerPush(metaworld.envs.mujoco.env_dict.ALL_V2_ENVIRONMENTS['push-v2']):
+  """Wrapper for the SawyerPush environment."""
+
+  def __init__(self,
+               goal_min_x=-0.1,
+               goal_min_y=0.5,
+               goal_max_x=0.1,
+               goal_max_y=0.9):
+    super(SawyerPush, self).__init__()
+    self._random_reset_space.low[3] = goal_min_x
+    self._random_reset_space.low[4] = goal_min_y
+    self._random_reset_space.high[3] = goal_max_x
+    self._random_reset_space.high[4] = goal_max_y
+    self._partially_observable = False
+    self._freeze_rand_vec = False
+    self._set_task_called = True
+    self.reset()
+    self._freeze_rand_vec = False  # Set False to randomize the goal position.
+
+  @property
+  def observation_space(self):
+    return gym.spaces.Box(
+        low=np.full(14, -np.inf),
+        high=np.full(14, np.inf),
+        dtype=np.float32)
+
+  def _get_obs(self):
+    finger_right, finger_left = (self._get_site_pos('rightEndEffector'),
+                                 self._get_site_pos('leftEndEffector'))
+    tcp_center = (finger_right + finger_left) / 2.0
+    gripper_distance = np.linalg.norm(finger_right - finger_left)
+    gripper_distance = np.clip(gripper_distance / 0.1, 0., 1.)
+    obj = self._get_pos_objects()
+    # Note: we should ignore the target gripper distance. The arm goal is set
+    # to be the same as the puck goal.
+    state = np.concatenate([tcp_center, obj, [gripper_distance]])
+    goal = np.concatenate([self._target_pos, self._target_pos, [0.5]])
+    return np.concatenate([state, goal]).astype(np.float32)
+
+  def step(self, action):
+    obs = super(SawyerPush, self).step(action)
+    dist = np.linalg.norm(self._target_pos - self._get_pos_objects())
+    r = float(dist < 0.05)  # Taken from the metaworld code.
+    return obs, r, False, {}
+
+
+class SawyerDrawer(
+    metaworld.envs.mujoco.env_dict.ALL_V2_ENVIRONMENTS['drawer-close-v2']):
+  """Wrapper for the SawyerDrawer environment."""
+
+  def __init__(self):
+    super(SawyerDrawer, self).__init__()
+    self._random_reset_space.low[0] = 0
+    self._random_reset_space.high[0] = 0
+    self._partially_observable = False
+    self._freeze_rand_vec = False
+    self._set_task_called = True
+    self._target_pos = np.zeros(0)  
+    self.reset()
+    self._freeze_rand_vec = False  # Set False to randomize the goal position.
+
+  def _get_pos_objects(self):
+    return self.get_body_com('drawer_link') +  np.array([.0, -.16, 0.0])
+
+  def reset_model(self):
+    super(SawyerDrawer, self).reset_model()
+    self._set_obj_xyz(np.random.uniform(-0.15, 0.0))
+    self._target_pos = self._get_pos_objects().copy()
+    self._set_obj_xyz(np.random.uniform(-0.15, 0.0))
+    return self._get_obs().astype(np.float32)  
+
+
+  @property
+  def observation_space(self):
+    return gym.spaces.Box(
+        low=np.full(8, -np.inf),
+        high=np.full(8, np.inf),
+        dtype=np.float32)
+
+  def _get_obs(self):
+    finger_right, finger_left = (self._get_site_pos('rightEndEffector'),
+                                 self._get_site_pos('leftEndEffector'))
+    tcp_center = (finger_right + finger_left) / 2.0
+    obj = self._get_pos_objects()
+    obs = np.concatenate([tcp_center, [obj[1]],
+                          self._target_pos, [self._target_pos[1]]])
+    return obs.astype(np.float32) 
+
+
+  def step(self, action):
+    obs = super(SawyerDrawer, self).step(action)
+    return obs, 0.0, False, {}
+
 
 class SawyerPeg(
     metaworld.envs.mujoco.env_dict.ALL_V2_ENVIRONMENTS['peg-insert-side-v2']):

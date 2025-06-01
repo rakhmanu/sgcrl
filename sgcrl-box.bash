@@ -10,4 +10,4 @@
 export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/u/ulzhalgas.rakhman/.mujoco/mujoco210/bin
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib/nvidia
-python lp_contrastive.pypython lp_contrastive.py --env=sawyer_box
+python lp_contrastive.py --env=sawyer_box

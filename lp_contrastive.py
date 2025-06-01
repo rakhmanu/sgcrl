@@ -16,7 +16,7 @@ from contrastive import utils as contrastive_utils
 import launchpad as lp
 import numpy as np
 import os
-from env_utils import SawyerBin, SawyerBox, SawyerPeg
+from env_utils import SawyerBin, SawyerBox, SawyerPeg,  SawyerDrawer, SawyerPush
 #import fetch_envs
 
 FLAGS = flags.FLAGS
@@ -29,14 +29,17 @@ flags.DEFINE_string('alg', 'contrastive_cpc', 'Algorithm type, e.g. default is c
 flags.DEFINE_string('env', 'sawyer_bin', 'Environment type, e.g. default is sawyer bin')
 flags.DEFINE_integer('num_steps', 8_000_000, 'Number of steps to run', lower_bound=0)
 flags.DEFINE_bool('sample_goals', False, 'sample the goal position uniformly according to the environment (corresponds to the original contrastive_rl algorithm)')
-flags.DEFINE_bool('render', True, 'Whether to render the environment during training or evaluation')
+
 
 # fixed goal coordinates for supported environments
 fixed_goal_dict={'point_Spiral11x11': [np.array([5,5], dtype=float), np.array([10,10], dtype=float)],
                      #note: sawyer fixed goal positions vary slightly with each episode
                       'sawyer_bin': np.array([0.12, 0.7, 0.02]),
                       'sawyer_box': np.array([0.0, 0.75, 0.133]),
-                      'sawyer_peg': np.array([-0.3, 0.6, 0.0])}
+                      'sawyer_peg': np.array([-0.3, 0.6, 0.0]),
+                      'sawyer_drawer': np.array([0.0, 0.85, 0.02]),
+                      'sawyer_push': np.array([0.0, 0.7, 0.02])
+                      }
 
 @functools.lru_cache
 def get_env(env_name, start_index, end_index, seed, fix_goals = False, fix_goals_actor = False, use_naive_sampling=False, clock_period=None):
@@ -112,6 +115,10 @@ def main(_):
       env = SawyerBox()
   elif env_name == "sawyer_peg":
       env = SawyerPeg() 
+  elif env_name == "sawyer_drawer":
+      env = SawyerDrawer()
+  elif env_name == "sawyer_push":
+      env = SawyerPush()
   #elif env_name == "fetch_reach":
   #     return fetch_envs.FetchReachEnv()     
   else:

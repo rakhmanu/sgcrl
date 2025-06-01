@@ -56,8 +56,11 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib/nvidia
 
 To run code, use
 ```
-export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
 python lp_contrastive.py
+python lp_contrastive.py --env=sawyer_peg
+python lp_contrastive.py --env=sawyer_box
+python lp_contrastive.py --env=sawyer_bin
+python lp_contrastive.py --env=sawyer_drawer --sample_goals=True
 ```
 
 
