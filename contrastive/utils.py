@@ -185,7 +185,7 @@ def make_environment(env_name, start_index, end_index,
   env = gym_wrapper.GymWrapper(gym_env)
   env = step_limit.StepLimitWrapper(env, step_limit=max_episode_steps)
   env = ObservationFilterWrapper(env, indices)
-  #env.render()
+  env.render()
   return env, obs_dim
 
 
