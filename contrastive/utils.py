@@ -18,6 +18,9 @@ import jax
 import numpy as np
 from torch.utils.tensorboard import SummaryWriter
 import os
+import random
+import imageio
+import metaworld
 
 def obs_to_goal_1d(obs, start_index, end_index):
   assert len(obs.shape) == 1
@@ -185,7 +188,52 @@ def make_environment(env_name, start_index, end_index,
   env = gym_wrapper.GymWrapper(gym_env)
   env = step_limit.StepLimitWrapper(env, step_limit=max_episode_steps)
   env = ObservationFilterWrapper(env, indices)
-  env.render()
+  env.reset()
+  #env.render()
+  all_renders = []
+
+  obs = env.reset()
+  for episode in range(10):
+      done = False
+      obs = env.reset()
+      
+      # Assume obs is an image frame
+      if obs is not None and hasattr(obs, "shape") and len(obs.shape) >= 2:
+          all_renders.append(obs)
+      
+      while not done:
+          action = env.action_space.sample()
+          obs, reward, done, info = env.step(action)
+          
+          if obs is not None and hasattr(obs, "shape") and len(obs.shape) >= 2:
+              all_renders.append(obs)
+
+  if all_renders:
+      imageio.mimsave("bin_episodes.mp4", all_renders, fps=20)
+      print(f"Saved {len(all_renders)} frames to video")
+  else:
+      print("No valid frames collected.")
+
+  # Record initial renders for 10 episodes
+  # all_renders = []
+  # for episode in range(10):
+  #    task = random.choice(env.train_tasks)
+  #    env.set_task(task)  # Set task
+
+      # Reset environment and record initial render
+  #    obs, _ = env.reset()  # Reset environment
+  #    all_renders.append(env.render())
+
+      # Record renders for 10 steps
+  #    for step in range(10):
+  #        a = env.action_space.sample()  # Sample an action
+  #        obs, reward, terminated, truncated, info = env.step(a)
+  #        all_renders.append(env.render())
+
+  # Save all renders as one video
+  # imageio.mimsave("all_episodes.mp4", all_renders, fps=20)
+
+  #print(f"Saved {len(all_renders)} frames to video")
   return env, obs_dim
 
 

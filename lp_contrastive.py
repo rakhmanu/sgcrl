@@ -17,7 +17,7 @@ import launchpad as lp
 import numpy as np
 import os
 from env_utils import SawyerBin, SawyerBox, SawyerPeg, SawyerDrawer, SawyerPush
-#import fetch_envs
+import fetch_envs
 
 FLAGS = flags.FLAGS
 
@@ -38,8 +38,8 @@ fixed_goal_dict={'point_Spiral11x11': [np.array([5,5], dtype=float), np.array([1
                       'sawyer_box': np.array([0.0, 0.75, 0.133]),
                       'sawyer_peg': np.array([-0.3, 0.6, 0.0]),
                       'sawyer_drawer': np.array([0.0, 0.85, 0.02]),
-                      'sawyer_push': np.array([0.0, 0.7, 0.02])
-                      #'fetch_reach': np.array([1.3, 0.75, 0.5])
+                      'sawyer_push': np.array([0.0, 0.7, 0.02]),
+                      'fetch_reach': np.array([1.3, 0.75, 0.5])
 }
 
 @functools.lru_cache
@@ -120,8 +120,8 @@ def main(_):
       env = SawyerDrawer()
   elif env_name == "sawyer_push":
       env = SawyerPush()
-  #elif env_name == "fetch_reach":
-  #    env = fetch_envs.FetchReachEnv()     
+  elif env_name == "fetch_reach":
+      env = fetch_envs.FetchReachEnv()     
   else:
       raise ValueError(f"Unknown environment {env_name}")
 

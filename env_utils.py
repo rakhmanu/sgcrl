@@ -33,10 +33,11 @@ def euler2quat(euler):
   return quat
 
 
-def load(env_name, fixed_start_end=None):
+def load(env_name, fixed_start_end=None, render_mode=None):
   """Loads the train and eval environments, as well as the obs_dim."""
   # pylint: disable=invalid-name
   kwargs = {}
+  
   if env_name == 'sawyer_bin':
     CLASS = SawyerBin
     max_episode_steps = 10
