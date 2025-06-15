@@ -16,133 +16,124 @@ from itertools import product
 
 # modified Tanh mean to be mapped to tanh(mean) to keep within [-1, 1]
 from distributional import NormalTanhDistribution
+
 @dataclasses.dataclass
-class ContrastiveNetworks:
-  """Network and pure functions for the Contrastive RL agent."""
-  policy_network: networks_lib.FeedForwardNetwork
-  q_network: networks_lib.FeedForwardNetwork
+class HierarchicalContrastiveNetworks:
+  """Hierarchical networks for Contrastive RL."""
+  high_policy_network: networks_lib.FeedForwardNetwork   # π_high(z | s, g)
+  low_policy_network: networks_lib.FeedForwardNetwork    # π_low(a | s, z)
+  high_q_network: networks_lib.FeedForwardNetwork        # Q_high(s, z, g)
+  low_q_network: networks_lib.FeedForwardNetwork         # Q_low(s, a, z)
+  high_repr_fn: Callable
+  low_repr_fn: Callable
+  high_sample: networks_lib.SampleFn
+  low_sample: networks_lib.SampleFn
+  high_sample_eval: Optional[networks_lib.SampleFn]
+  low_sample_eval: Optional[networks_lib.SampleFn]
   log_prob: networks_lib.LogProbFn
-  repr_fn: Callable[Ellipsis, networks_lib.NetworkOutput]
-  sample: networks_lib.SampleFn
-  sample_eval: Optional[networks_lib.SampleFn] = None
-  
-
-@dataclasses.dataclass
-class HierarchicalContrastiveNetworks(ContrastiveNetworks):
-  high_level_policy_network: networks_lib.FeedForwardNetwork = dataclasses.field(default=None)
 
 
-
-def make_hierarchical_networks(
+def make_hcrl_networks(
     spec,
     obs_dim,
+    subgoal_dim,
     repr_dim=64,
-    repr_norm=False,
-    repr_norm_temp=False,
+    repr_norm=True,
     hidden_layer_sizes=(256, 256),
     actor_min_std=1e-6,
-    twin_q=False,
-    use_image_obs=False,
-    subgoal_dim=None,  # optional projection of subgoal
 ):
-  """Creates hierarchical contrastive RL networks."""
+  """Creates hierarchical contrastive networks."""
 
-  num_dimensions = np.prod(spec.actions.shape, dtype=int)
-  TORSO = networks_lib.AtariTorso
+  def mlp(output_dim):
+    return hk.nets.MLP(
+        list(hidden_layer_sizes) + [output_dim],
+        w_init=hk.initializers.VarianceScaling(1.0, 'fan_avg', 'uniform'),
+        activation=jax.nn.relu)
 
-  def _unflatten_obs(obs):
-    state = jnp.reshape(obs[:, :obs_dim], (-1, 64, 64, 3)) / 255.0
-    goal = jnp.reshape(obs[:, obs_dim:], (-1, 64, 64, 3)) / 255.0
-    return state, goal
-
-  def _repr_fn(obs, action, hidden=None):
-    if hidden is None:
-      if use_image_obs:
-        state, goal = _unflatten_obs(obs)
-        img_encoder = TORSO()
-        state = img_encoder(state)
-        goal = img_encoder(goal)
-      else:
-        state = obs[:, :obs_dim]
-        goal = obs[:, obs_dim:]
-    else:
-      state, goal = hidden
-
-    sa_encoder = hk.nets.MLP(
-        list(hidden_layer_sizes) + [repr_dim],
-        activation=jax.nn.relu,
-        name='sa_encoder')
-    sa_repr = sa_encoder(jnp.concatenate([state, action], axis=-1))
-
-    g_encoder = hk.nets.MLP(
-        list(hidden_layer_sizes) + [repr_dim],
-        activation=jax.nn.relu,
-        name='g_encoder')
-    g_repr = g_encoder(goal)
+  # Low-level Q: Q_low(s, a, z) = φ(s, a)^T ψ(z)
+  def low_repr_fn(obs, action):
+    s = obs[:, :obs_dim]
+    z = obs[:, obs_dim:]
+    sa_repr = mlp(repr_dim)(jnp.concatenate([s, action], axis=-1))
+    z_repr = mlp(repr_dim)(z)
 
     if repr_norm:
-      sa_repr = sa_repr / jnp.linalg.norm(sa_repr, axis=1, keepdims=True)
-      g_repr = g_repr / jnp.linalg.norm(g_repr, axis=1, keepdims=True)
-      if repr_norm_temp:
-        log_scale = hk.get_parameter('repr_log_scale', [], dtype=sa_repr.dtype,
-                                     init=jnp.zeros)
-        sa_repr = sa_repr / jnp.exp(log_scale)
-    return sa_repr, g_repr, (state, goal)
+      sa_repr /= jnp.linalg.norm(sa_repr, axis=-1, keepdims=True)
+      z_repr /= jnp.linalg.norm(z_repr, axis=-1, keepdims=True)
 
-  def _combine_repr(sa_repr, g_repr):
-    return jax.numpy.einsum('ik,jk->ij', sa_repr, g_repr)
+    return sa_repr, z_repr
 
-  def _critic_fn(obs, action):
-    sa_repr, g_repr, hidden = _repr_fn(obs, action)
-    critic_val = _combine_repr(sa_repr, g_repr)
-    if twin_q:
-      sa_repr2, g_repr2, _ = _repr_fn(obs, action, hidden=hidden)
-      product2 = _combine_repr(sa_repr2, g_repr2)
-      critic_val = jnp.stack([critic_val, product2], axis=-1)
-    return critic_val, sa_repr, g_repr
+  def low_q_fn(obs, action):
+    sa_repr, z_repr = low_repr_fn(obs, action)
+    q_val = jnp.sum(sa_repr * z_repr, axis=-1)
+    return q_val, sa_repr, z_repr
 
-  def _actor_fn(obs):
-    if use_image_obs:
-      state, goal = _unflatten_obs(obs)
-      obs = jnp.concatenate([state, goal], axis=-1)
-      obs = TORSO()(obs)
-    network = hk.Sequential([
-        hk.nets.MLP(list(hidden_layer_sizes), activate_final=True),
-        NormalTanhDistribution(num_dimensions, min_scale=actor_min_std),
+  # High-level Q: Q_high(s, z, g) = φ(s, z)^T ψ(g)
+  def high_repr_fn(obs, subgoal):
+    s = obs[:, :obs_dim]
+    g = obs[:, obs_dim:]
+    sz_repr = mlp(repr_dim)(jnp.concatenate([s, subgoal], axis=-1))
+    g_repr = mlp(repr_dim)(g)
+
+    if repr_norm:
+      sz_repr /= jnp.linalg.norm(sz_repr, axis=-1, keepdims=True)
+      g_repr /= jnp.linalg.norm(g_repr, axis=-1, keepdims=True)
+
+    return sz_repr, g_repr
+
+  def high_q_fn(obs, subgoal):
+    sz_repr, g_repr = high_repr_fn(obs, subgoal)
+    q_val = jnp.sum(sz_repr * g_repr, axis=-1)
+    return q_val, sz_repr, g_repr
+
+  # Actor Networks
+  def high_actor_fn(obs):
+    s = obs[:, :obs_dim]
+    g = obs[:, obs_dim:]
+    inp = jnp.concatenate([s, g], axis=-1)
+    net = hk.Sequential([
+        hk.nets.MLP(list(hidden_layer_sizes), activation=jax.nn.relu, activate_final=True),
+        NormalTanhDistribution(subgoal_dim, min_scale=actor_min_std),
     ])
-    return network(obs)
+    return net(inp)
 
-  def _high_level_policy_fn(st_goal_k):
-    """π_high(s_{t+k} | s_t, g, k)"""
-    return hk.nets.MLP(
-        list(hidden_layer_sizes) + [obs_dim],  # output = subgoal state
-        activation=jax.nn.relu)(st_goal_k)
-
-  # Dummy input construction
-  dummy_obs = utils.add_batch_dim(utils.zeros_like(spec.observations))
-  dummy_action = utils.add_batch_dim(utils.zeros_like(spec.actions))
-
-  # High-level obs: concat s_t, g, and [k] as scalar
-  dummy_goal_input = jnp.concatenate(
-      [dummy_obs[:, :obs_dim], dummy_obs[:, obs_dim:], jnp.ones((1, 1))], axis=-1
-  )
+  def low_actor_fn(obs):
+    s = obs[:, :obs_dim]
+    z = obs[:, obs_dim:]
+    inp = jnp.concatenate([s, z], axis=-1)
+    net = hk.Sequential([
+        hk.nets.MLP(list(hidden_layer_sizes), activation=jax.nn.relu, activate_final=True),
+        NormalTanhDistribution(np.prod(spec.actions.shape), min_scale=actor_min_std),
+    ])
+    return net(inp)
 
   # Haiku transforms
-  policy = hk.without_apply_rng(hk.transform(_actor_fn))
-  critic = hk.without_apply_rng(hk.transform(_critic_fn))
-  repr_fn = hk.without_apply_rng(hk.transform(_repr_fn))
-  high_policy = hk.without_apply_rng(hk.transform(_high_level_policy_fn))
+  high_policy = hk.without_apply_rng(hk.transform(high_actor_fn))
+  low_policy = hk.without_apply_rng(hk.transform(low_actor_fn))
+  high_q = hk.without_apply_rng(hk.transform(high_q_fn))
+  low_q = hk.without_apply_rng(hk.transform(low_q_fn))
+  high_repr = hk.without_apply_rng(hk.transform(high_repr_fn))
+  low_repr = hk.without_apply_rng(hk.transform(low_repr_fn))
+
+  # Dummy inputs
+  dummy_obs = utils.add_batch_dim(utils.zeros_like(spec.observations))
+  dummy_subgoal = utils.add_batch_dim(jnp.zeros((subgoal_dim,), dtype=jnp.float32))
+  dummy_action = utils.add_batch_dim(utils.zeros_like(spec.actions))
 
   return HierarchicalContrastiveNetworks(
-      policy_network=networks_lib.FeedForwardNetwork(
-          lambda key: policy.init(key, dummy_obs), policy.apply),
-      q_network=networks_lib.FeedForwardNetwork(
-          lambda key: critic.init(key, dummy_obs, dummy_action), critic.apply),
-      repr_fn=repr_fn.apply,
+      high_policy_network=networks_lib.FeedForwardNetwork(
+          lambda key: high_policy.init(key, dummy_obs), high_policy.apply),
+      low_policy_network=networks_lib.FeedForwardNetwork(
+          lambda key: low_policy.init(key, dummy_obs), low_policy.apply),
+      high_q_network=networks_lib.FeedForwardNetwork(
+          lambda key: high_q.init(key, dummy_obs, dummy_subgoal), high_q.apply),
+      low_q_network=networks_lib.FeedForwardNetwork(
+          lambda key: low_q.init(key, dummy_obs, dummy_action), low_q.apply),
+      high_repr_fn=high_repr.apply,
+      low_repr_fn=low_repr.apply,
+      high_sample=lambda params, key: params.sample(seed=key),
+      low_sample=lambda params, key: params.sample(seed=key),
+      high_sample_eval=lambda params, key: params.mode(),
+      low_sample_eval=lambda params, key: params.mode(),
       log_prob=lambda params, actions: params.log_prob(actions),
-      sample=lambda params, key: params.sample(seed=key),
-      sample_eval=lambda params, key: params.mode(),
-      high_level_policy_network=networks_lib.FeedForwardNetwork(
-          lambda key: high_policy.init(key, dummy_goal_input),
-          high_policy.apply),
   )

@@ -161,14 +161,25 @@ class ContrastiveLearner(Learner):
         w = jnp.clip(w, 0, w_clipping)
         # (B, B, 2) --> (B, 2), computes diagonal of each twin Q.
         pos_logits = jax.vmap(jnp.diag, -1, -1)(logits)
+        labels_pos = jnp.ones_like(pos_logits)
         loss_pos = optax.sigmoid_binary_cross_entropy(
-            logits=pos_logits, labels=1)  # [B, 2]
+            logits=pos_logits, labels=labels_pos)  # [B, 2]
 
         neg_logits = logits[jnp.arange(batch_size), goal_indices]
+        labels_ones = jnp.ones_like(neg_logits)
+        labels_zeros = jnp.zeros_like(neg_logits)
         loss_neg1 = w[:, None] * optax.sigmoid_binary_cross_entropy(
-            logits=neg_logits, labels=1)  # [B, 2]
+            logits=neg_logits, labels=labels_ones)  # [B, 2]
         loss_neg2 = optax.sigmoid_binary_cross_entropy(
-            logits=neg_logits, labels=0)  # [B, 2]
+            logits=neg_logits, labels=labels_zeros)  # [B, 2]
+        #loss_pos = optax.sigmoid_binary_cross_entropy(
+        #    logits=pos_logits, labels=1)  # [B, 2]
+
+        #neg_logits = logits[jnp.arange(batch_size), goal_indices]
+        #loss_neg1 = w[:, None] * optax.sigmoid_binary_cross_entropy(
+        #    logits=neg_logits, labels=1)  # [B, 2]
+        #loss_neg2 = optax.sigmoid_binary_cross_entropy(
+        #    logits=neg_logits, labels=0)  # [B, 2]
 
         if config.add_mc_to_td:
           loss = ((1 + (1 - config.discount)) * loss_pos

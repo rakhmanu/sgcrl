@@ -16,9 +16,9 @@ from acme.jax import variable_utils
 from acme.utils import counting
 from acme.utils import loggers
 from contrastive import config as contrastive_config
-#from contrastive import learning
+from contrastive import learning
 from contrastive import hlearning
-#from contrastive import networks as contrastive_networks
+from contrastive import networks 
 from contrastive import hnetworks
 from contrastive import utils as contrastive_utils
 import optax
@@ -48,7 +48,7 @@ class ContrastiveBuilder(builders.ActorLearnerBuilder):
   def make_learner(
       self,
       random_key,
-      hnetworks,
+      networks,
       dataset,
       replay_client = None,
       counter = None, 
@@ -57,8 +57,8 @@ class ContrastiveBuilder(builders.ActorLearnerBuilder):
     policy_optimizer = optax.adam(
         learning_rate=self._config.actor_learning_rate, eps=1e-7)
     q_optimizer = optax.adam(learning_rate=self._config.learning_rate, eps=1e-7)
-    return hlearning.ContrastiveLearner(
-        hnetworks=hnetworks,
+    return learning.ContrastiveLearner(
+        networks=networks,
         rng=random_key,
         policy_optimizer=policy_optimizer,
         q_optimizer=q_optimizer,
