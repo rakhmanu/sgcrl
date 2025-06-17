@@ -48,27 +48,35 @@ class ContrastiveBuilder(builders.ActorLearnerBuilder):
   def make_learner(
       self,
       random_key,
-      networks,
+      hnetworks,
       dataset,
       replay_client = None,
       counter = None, 
   ):
     # Create optimizers
-    policy_optimizer = optax.adam(
-        learning_rate=self._config.actor_learning_rate, eps=1e-7)
-    q_optimizer = optax.adam(learning_rate=self._config.learning_rate, eps=1e-7)
-    return learning.ContrastiveLearner(
-        networks=networks,
+    #policy_optimizer = optax.adam(
+    #    learning_rate=self._config.actor_learning_rate, eps=1e-7)
+    #q_optimizer = optax.adam(learning_rate=self._config.learning_rate, eps=1e-7)
+    high_policy_opt = optax.adam(learning_rate=self._config.actor_learning_rate, eps=1e-7)
+    high_q_opt = optax.adam(learning_rate=self._config.learning_rate, eps=1e-7)
+    low_policy_opt = optax.adam(learning_rate=self._config.actor_learning_rate, eps=1e-7)
+    low_q_opt = optax.adam(learning_rate=self._config.learning_rate, eps=1e-7)
+    alpha_opt = optax.adam(learning_rate=self._config.learning_rate, eps=1e-7)
+    return hlearning.HierarchicalContrastiveLearner(
+        hnetworks=hnetworks,
         rng=random_key,
-        policy_optimizer=policy_optimizer,
-        q_optimizer=q_optimizer,
+        #policy_optimizer=policy_optimizer,
+        #q_optimizer = q_optimizer,
+        high_policy_opt=high_policy_opt,
+        high_q_opt=high_q_opt,
+        low_policy_opt=low_policy_opt,
+        low_q_opt=low_q_opt,
+        alpha_opt=alpha_opt,
         iterator=dataset,
         counter=counter,
         logger=self._logger_fn(),
-        obs_to_goal=functools.partial(contrastive_utils.obs_to_goal_2d,
-                                      start_index=self._config.start_index,
-                                      end_index=self._config.end_index),
-        config=self._config)
+        config=self._config
+    )
 
   def make_actor(
       self,
@@ -142,7 +150,8 @@ class ContrastiveBuilder(builders.ActorLearnerBuilder):
       goal = tf.gather(goal, goal_index[:-1])
       new_obs = tf.concat([state, goal], axis=1)
       new_next_obs = tf.concat([next_state, goal], axis=1)
-      
+      high = goal
+      low = tf.roll(goal, shift=1, axis=0)
       transition = types.Transition(
           observation=new_obs,
           action=sample.data.action[:-1],
@@ -150,8 +159,10 @@ class ContrastiveBuilder(builders.ActorLearnerBuilder):
           discount=sample.data.discount[:-1],
           next_observation=new_next_obs,
           extras={
-              'next_action': sample.data.action[1:],
-          })
+                'next_action': sample.data.action[1:],
+                'high': high,
+                'low': low,
+            })
       # Shift for the transpose_shuffle.
       shift = tf.random.uniform((), 0, seq_len, tf.int32)
       transition = tree.map_structure(lambda t: tf.roll(t, shift, axis=0),

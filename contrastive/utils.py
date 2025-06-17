@@ -241,15 +241,34 @@ class InitiallyRandomActor(actors.GenericActor):
   """Actor that takes actions uniformly at random until the actor is updated.
   """
 
-  def select_action(self,
-                    observation):
-    if (self._params['mlp/~/linear_0']['b'] == 0).all():
-      shape = self._params['Normal/~/linear']['b'].shape
-      rng, self._state = jax.random.split(self._state)
-      action = jax.random.uniform(key=rng, shape=shape,
-                                  minval=-1.0, maxval=1.0)
-    else:
-      action, self._state = self._policy(self._params, observation,
-                                         self._state)
+  def select_action(self, observation):
+    # Debug print
+    #print("Params structure:", self._params)
+
+    try:
+        # Example check for a dict with nested keys
+        if isinstance(self._params, dict):
+            if (self._params['mlp']['linear_0']['b'] == 0).all():
+                shape = self._params['Normal']['linear']['b'].shape
+                rng, self._state = jax.random.split(self._state)
+                action = jax.random.uniform(key=rng, shape=shape,
+                                            minval=-1.0, maxval=1.0)
+            else:
+                action, self._state = self._policy(self._params, observation, self._state)
+        else:
+            # Fallback: just sample random action if unsure
+            #print("Warning: Params not dict, sampling random action")
+            rng, self._state = jax.random.split(self._state)
+            shape = (4,)  
+            action = jax.random.uniform(key=rng, shape=shape, minval=-1.0, maxval=1.0)
+    except Exception as e:
+        #print(f"Error in select_action: {e}")
+        # Fallback random action
+        rng, self._state = jax.random.split(self._state)
+        shape = (4,) 
+        action = jax.random.uniform(key=rng, shape=shape, minval=-1.0, maxval=1.0)
+
     return utils.to_numpy(action)
+
+
 

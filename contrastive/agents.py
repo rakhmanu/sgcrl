@@ -9,7 +9,7 @@ from acme.utils import loggers
 from contrastive import builder
 from contrastive import config as contrastive_config
 from contrastive import distributed_layout
-from contrastive import networks
+from contrastive import hnetworks
 from contrastive import utils as contrastive_utils
 import contrastive
 from contrastive import utils as contrastive_utils
@@ -18,7 +18,7 @@ from env_utils import SawyerBin, SawyerBox, SawyerPeg, SawyerDrawer, SawyerPush
 import dm_env
 
 NetworkFactory = Callable[[specs.EnvironmentSpec],
-                          networks.ContrastiveNetworks]
+                          hnetworks.HierarchicalContrastiveNetworks]
 
 
 class DistributedContrastive(distributed_layout.DistributedLayout):
@@ -52,7 +52,7 @@ class DistributedContrastive(distributed_layout.DistributedLayout):
     contrastive_builder = builder.ContrastiveBuilder(config, logger_fn=logger_fn)
     if evaluator_factories is None:
       eval_policy_factory = (
-          lambda n: networks.apply_policy_and_sample(n, True))
+          lambda n: hnetworks.apply_policy_and_sample(n, True))
       eval_observers = [
           contrastive_utils.SuccessObserver(),
           contrastive_utils.DistanceObserver(
@@ -84,7 +84,7 @@ class DistributedContrastive(distributed_layout.DistributedLayout):
         environment_factory_fixed_goals=environment_factory_fixed_goals,
         network_factory=network_factory,
         builder=contrastive_builder,
-        policy_network=networks.apply_policy_and_sample,
+        policy_network=hnetworks.apply_policy_and_sample,
         evaluator_factories=evaluator_factories,
         num_actors=num_actors,
         max_number_of_steps=max_number_of_steps,

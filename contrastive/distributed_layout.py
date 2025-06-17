@@ -3,7 +3,7 @@
 import dataclasses
 import logging
 from typing import Any, Callable, Optional, Sequence
-
+from contrastive.hnetworks import make_hcrl_networks
 from acme import core
 from acme import environment_loop
 from acme import specs
@@ -200,8 +200,18 @@ class DistributedLayout:
         specs.make_environment_spec(self._environment_factory(dummy_seed)))
 
     # Creates the networks to optimize (online) and target networks.
-    networks = self._network_factory(environment_spec)
-
+    #networks = self._network_factory(environment_spec)
+    obs_dim = environment_spec.observations.shape[0]
+    subgoal_dim = 10  # ← set according to your task
+    repr_dim = 64     # ← set according to your config or task
+    networks = make_hcrl_networks(
+        spec=environment_spec,
+        obs_dim=obs_dim,
+        subgoal_dim=subgoal_dim,
+        repr_dim=repr_dim,
+        repr_norm=True,
+        hidden_layer_sizes=(256, 256)
+    )
     if self._prefetch_size > 1:
       # When working with single GPU we should prefetch to device for
       # efficiency. If running on TPU this isn't necessary as the computation

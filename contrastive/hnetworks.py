@@ -31,7 +31,18 @@ class HierarchicalContrastiveNetworks:
   high_sample_eval: Optional[networks_lib.SampleFn]
   low_sample_eval: Optional[networks_lib.SampleFn]
   log_prob: networks_lib.LogProbFn
+  
+def apply_policy_and_sample(
+    networks,
+    eval_mode = False):
+  """Returns a function that computes actions."""
+  sample_fn = networks.sample if not eval_mode else networks.sample_eval
+  if not sample_fn:
+    raise ValueError('sample function is not provided')
 
+  def apply_and_sample(params, key, obs):
+    return sample_fn(networks.policy_network.apply(params, obs), key)
+  return apply_and_sample
 
 def make_hcrl_networks(
     spec,
@@ -70,21 +81,23 @@ def make_hcrl_networks(
 
   # High-level Q: Q_high(s, z, g) = φ(s, z)^T ψ(g)
   def high_repr_fn(obs, subgoal):
-    s = obs[:, :obs_dim]
-    g = obs[:, obs_dim:]
+    s = obs[:obs_dim]
+    g = obs[obs_dim:]
     sz_repr = mlp(repr_dim)(jnp.concatenate([s, subgoal], axis=-1))
     g_repr = mlp(repr_dim)(g)
 
     if repr_norm:
-      sz_repr /= jnp.linalg.norm(sz_repr, axis=-1, keepdims=True)
-      g_repr /= jnp.linalg.norm(g_repr, axis=-1, keepdims=True)
-
+        sz_repr /= jnp.linalg.norm(sz_repr, axis=-1, keepdims=True)
+        g_repr /= jnp.linalg.norm(g_repr, axis=-1, keepdims=True)
+    jax.debug.print("obs shape: {}", obs.shape)
+    
     return sz_repr, g_repr
 
   def high_q_fn(obs, subgoal):
     sz_repr, g_repr = high_repr_fn(obs, subgoal)
     q_val = jnp.sum(sz_repr * g_repr, axis=-1)
     return q_val, sz_repr, g_repr
+
 
   # Actor Networks
   def high_actor_fn(obs):
